@@ -17,7 +17,10 @@ run:
     mkdir -p bbl-state
     tar czf state.tgz bbl-state
 
+    set +e
     gsutil ls gs://${PROJECT_ID}/bosh
-    if [[ $? -ge 0 ]]; then
+    resp=$?
+    set -e
+    if [[ $resp -ge 0 ]]; then
       gsutil cp state.tgz gs://${PROJECT_ID}/bosh/state.tgz
     fi
