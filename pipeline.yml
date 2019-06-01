@@ -27,6 +27,14 @@ resources:
     json_key: ((gcp_credentials_json))
     versioned_file: bosh/state.tgz
 
+# CF vars
+- name: cf-vars
+  type: gcs-resource
+  source:
+    bucket: ((project_id))
+    json_key: ((gcp_credentials_json))
+    versioned_file: cf/cf-vars.yml
+
 # This repo
 - name: cf-deployment-pipeline
   type: git
@@ -44,18 +52,12 @@ resources:
     branch: v1.0.0
 
 # Files for deploying CF
-# - name: cf-deployment
-#   type: git
-#   check_every: 2m
-#   source:
-#     uri: https://github.com/cloudfoundry/cf-deployment.git
-#     tag_filter: v9.*
-
-- name: bosh-deployment
+- name: cf-deployment
   type: git
   check_every: 2m
   source:
-    uri: https://github.com/cloudfoundry/bosh-deployment.git
+    uri: https://github.com/cloudfoundry/cf-deployment.git
+    tag_filter: v9.*
 
 # Docker image for tasks
 - name: pcf-ops
@@ -127,7 +129,6 @@ jobs:
       trigger: true
     - get: pcf-ops
     - get: terraform-infra
-    - get: bosh-deployment
     - get: bosh-state
       params:
         unpack: true
@@ -137,22 +138,33 @@ jobs:
     params:
       DOMAIN: ((domain))
       BBL_GCP_REGION: ((region))
-    # ensure:
-    #   in_parallel:
-    #   - put: bosh-state
-    #     params:
-    #       file: bosh-state/state.tgz
+    ensure:
+      put: bosh-state
+      params:
+        file: bosh-state/state.tgz
 
-# - name: deploy-cf
-#   serial: true
-#   serial_groups:
-#   - bosh
-#   plan:
-#   - in_parallel:
-#     - get: cf-deployment-pipeline
-#       passed:
-#       - deploy-director
-#       trigger: true
-#     - get: cf-deployment
-#   # - task: deploy-cf
-#   #   file:
+- name: deploy-cf
+  serial: true
+  serial_groups:
+  - bosh
+  plan:
+  - in_parallel:
+    - get: cf-deployment-pipeline
+      passed:
+      - deploy-director
+      trigger: true
+    - get: cf-deployment
+    - get: bosh-state
+      params:
+        unpack: true
+    - get: cf-vars
+    - get: pcf-ops
+  - task: deploy-cf
+    file: cf-deployment-pipeline/tasks/deploy-cf.yml
+    image: pcf-ops
+    params:
+      DOMAIN: ((domain))
+    ensure:
+      put: cf-vars
+      params:
+        file: cf-vars/cf-vars.yml
