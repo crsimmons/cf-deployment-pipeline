@@ -1,16 +1,4 @@
 ---
-groups:
-- name: deploy
-  jobs:
-  - setup-project
-  - deploy-director
-  # - deploy-cf
-- name: destroy
-  jobs:
-  # - delete-cf
-  # - destroy-director
-  - teardown-project
-
 resource_types:
 - name: gcs-resource
   type: docker-image
@@ -37,7 +25,7 @@ resources:
   source:
     bucket: ((project_id))
     json_key: ((gcp_credentials_json))
-    versioned_file: bosh/bosh-state.tgz
+    versioned_file: bosh/state.tgz
 
 # This repo
 - name: cf-deployment-pipeline
@@ -165,24 +153,3 @@ jobs:
 #     - get: cf-deployment
 #   # - task: deploy-cf
 #   #   file:
-
-
-- name: teardown-project
-  serial: true
-  serial_groups:
-  - bosh
-  plan:
-  - in_parallel:
-    - get: cf-deployment-pipeline
-      trigger: true
-      # passed: [destroy-director]
-    - get: concourse-gcp-tf-bootstrap
-      passed: [setup-project]
-    - get: project-tfstate
-      passed: [setup-project]
-  - task: bootstrap-terraform
-    file: concourse-gcp-tf-bootstrap/tasks/teardown.yml
-    input_mapping:
-      gcp-bootstrap: concourse-gcp-tf-bootstrap
-      tfstate: project-tfstate
-    params: *project-ops-params
