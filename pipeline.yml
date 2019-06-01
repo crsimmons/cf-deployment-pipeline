@@ -1,0 +1,188 @@
+---
+groups:
+- name: deploy
+  jobs:
+  - setup-project
+  - deploy-director
+  # - deploy-cf
+- name: destroy
+  jobs:
+  # - delete-cf
+  # - destroy-director
+  - teardown-project
+
+resource_types:
+- name: gcs-resource
+  type: docker-image
+  source:
+    repository: frodenas/gcs-resource
+- name: terraform
+  type: docker-image
+  source:
+    repository: ljfranklin/terraform-resource
+
+resources:
+
+# tfstate for the project and state bucket
+- name: project-tfstate
+  type: gcs-resource
+  source:
+    bucket: ((project_id))
+    json_key: ((gcp_credentials_json))
+    versioned_file: ci/terraform.tfstate
+
+# Bosh state
+- name: bosh-state
+  type: gcs-resource
+  source:
+    bucket: ((project_id))
+    json_key: ((gcp_credentials_json))
+    versioned_file: bosh/bosh-state.tgz
+
+# This repo
+- name: cf-deployment-pipeline
+  type: git
+  check_every: 2m
+  source:
+    uri: https://github.com/crsimmons/cf-deployment-pipeline.git
+    branch: master
+
+# Bootstrapping the GCP project
+- name: concourse-gcp-tf-bootstrap
+  type: git
+  check_every: 2m
+  source:
+    uri: https://github.com/EngineerBetter/concourse-gcp-tf-bootstrap.git
+    branch: v1.0.0
+
+# Files for deploying CF
+# - name: cf-deployment
+#   type: git
+#   check_every: 2m
+#   source:
+#     uri: https://github.com/cloudfoundry/cf-deployment.git
+#     tag_filter: v9.*
+
+- name: bosh-deployment
+  type: git
+  check_every: 2m
+  source:
+    uri: https://github.com/cloudfoundry/bosh-deployment.git
+
+# Docker image for tasks
+- name: pcf-ops
+  type: docker-image
+  source:
+    repository: engineerbetter/pcf-ops
+
+# Terraform for additional infrastructure
+- name: terraform-infra
+  type: terraform
+  source:
+    env_name: ci
+    backend_type: gcs
+    backend_config:
+      bucket: ((project_id))
+      credentials: ((gcp_credentials_json))
+      prefix: sa
+    vars:
+      region: ((region))
+      gcp_creds: ((gcp_credentials_json))
+      project_id: ((project_id))
+      domain: ((domain))
+
+jobs:
+- name: setup-project
+  serial: true
+  plan:
+  - in_parallel:
+    - get: cf-deployment-pipeline
+      trigger: true
+    - get: concourse-gcp-tf-bootstrap
+    - get: pcf-ops
+  - task: bootstrap-terraform
+    file: concourse-gcp-tf-bootstrap/tasks/bootstrap.yml
+    input_mapping:
+      gcp-bootstrap: concourse-gcp-tf-bootstrap
+    params: &project-ops-params
+      BILLING_ACCOUNT_ID: ((billing_account_id))
+      BUCKET_LOCATION: ((region))
+      FOLDER_NAME: ((folder_name))
+      GCP_CREDENTIALS_JSON: ((gcp_credentials_json))
+      ORGANIZATION_ID: ((organization_id))
+      PROJECT_ID: ((project_id))
+      PROJECT_NAME: ((project_name))
+  - in_parallel:
+    - task: init-bosh-files
+      file: cf-deployment-pipeline/tasks/init-bosh-files.yml
+      image: pcf-ops
+      params:
+        GCP_CREDENTIALS_JSON: ((gcp_credentials_json))
+        PROJECT_ID: ((project_id))
+        REGION: ((region))
+    - put: project-tfstate
+      params:
+        file: tfstate-out/terraform.tfstate
+    - put: terraform-infra
+      params:
+        terraform_source: cf-deployment-pipeline/tf
+
+- name: deploy-director
+  serial: true
+  serial_groups:
+  - bosh
+  plan:
+  - in_parallel:
+    - get: cf-deployment-pipeline
+      passed:
+      - setup-project
+      trigger: true
+    - get: pcf-ops
+    - get: terraform-infra
+    - get: bosh-deployment
+    - get: bosh-state
+      params:
+        unpack: true
+  - task: deploy-director
+    file: cf-deployment-pipeline/tasks/deploy-director.yml
+    image: pcf-ops
+    # ensure:
+    #   in_parallel:
+    #   - put: bosh-state
+    #     params:
+    #       file: bosh-state/state.tgz
+
+# - name: deploy-cf
+#   serial: true
+#   serial_groups:
+#   - bosh
+#   plan:
+#   - in_parallel:
+#     - get: cf-deployment-pipeline
+#       passed:
+#       - deploy-director
+#       trigger: true
+#     - get: cf-deployment
+#   # - task: deploy-cf
+#   #   file:
+
+
+- name: teardown-project
+  serial: true
+  serial_groups:
+  - bosh
+  plan:
+  - in_parallel:
+    - get: cf-deployment-pipeline
+      trigger: true
+      # passed: [destroy-director]
+    - get: concourse-gcp-tf-bootstrap
+      passed: [setup-project]
+    - get: project-tfstate
+      passed: [setup-project]
+  - task: bootstrap-terraform
+    file: concourse-gcp-tf-bootstrap/tasks/teardown.yml
+    input_mapping:
+      gcp-bootstrap: concourse-gcp-tf-bootstrap
+      tfstate: project-tfstate
+    params: *project-ops-params

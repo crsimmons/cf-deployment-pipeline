@@ -1,0 +1,14 @@
+---
+platform: linux
+
+inputs:
+- name: terraform-infra
+- name: bosh-state
+- name: bosh-deployment
+
+run:
+  path: bash
+  args:
+  - -euc
+  - |
+    sleep 60
