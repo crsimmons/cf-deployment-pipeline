@@ -134,6 +134,8 @@ jobs:
   - task: deploy-director
     file: cf-deployment-pipeline/tasks/deploy-director.yml
     image: pcf-ops
+    params:
+      DOMAIN: ((domain))
     # ensure:
     #   in_parallel:
     #   - put: bosh-state
