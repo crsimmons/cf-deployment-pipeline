@@ -136,6 +136,7 @@ jobs:
     image: pcf-ops
     params:
       DOMAIN: ((domain))
+      BBL_GCP_REGION: ((region))
     # ensure:
     #   in_parallel:
     #   - put: bosh-state

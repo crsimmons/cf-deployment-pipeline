@@ -3,6 +3,7 @@ platform: linux
 
 params:
   DOMAIN:
+  BBL_GCP_REGION:
 
 inputs:
 - name: terraform-infra
