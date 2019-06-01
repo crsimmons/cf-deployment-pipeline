@@ -1,0 +1,38 @@
+---
+platform: linux
+
+params:
+  DOMAIN:
+
+inputs:
+- name: bosh-state
+- name: cf-deployment
+- name: cf-vars
+
+outputs:
+- name: cf-vars
+
+run:
+  path: bash
+  args:
+  - -euc
+  - |
+    pushd bosh-state/bbl-state
+      eval "$(bbl print-env)"
+    popd
+
+    export IAAS_INFO=google-kvm
+    export STEMCELL_VERSION=$(bosh interpolate cf-deployment.yml --path=/stemcells/alias=default/version)
+
+    echo "uploading stemcell"
+    bosh upload-stemcell https://bosh.io/d/stemcells/bosh-${IAAS_INFO}-ubuntu-xenial-go_agent?v=${STEMCELL_VERSION}
+
+    echo "deploying cf"
+    bosh -d cf deploy cf-deployment/cf-deployment.yml \
+      --vars-store cf-vars/cf-vars.yml \
+      -v system_domain="system.${DOMAIN}" \
+      -v app_domains="[apps.${DOMAIN}]" \
+      -v smoke_test_app_domain="apps.${DOMAIN}" \
+      -o cf-deployment/operations/use-compiled-releases.yml \
+      -o cf-deployment/operations/override-app-domains.yml \
+      --non-interactive

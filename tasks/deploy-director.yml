@@ -8,7 +8,6 @@ params:
 inputs:
 - name: terraform-infra
 - name: bosh-state
-- name: bosh-deployment
 
 outputs:
 - name: bosh-state
