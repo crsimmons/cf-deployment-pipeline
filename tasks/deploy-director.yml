@@ -16,8 +16,8 @@ run:
   - -euc
   - |
     export BBL_GCP_SERVICE_ACCOUNT_KEY=$(jq -r '.service_account_key' terraform-infra/metadata | base64 --decode)
-    jq -r '.bbl_cert' ../../terraform-infra/metadata > cert.pem
-    jq -r '.bbl_private_key' ../../terraform-infra/metadata > key
+    jq -r '.bbl_cert' terraform-infra/metadata > cert.pem
+    jq -r '.bbl_private_key' terraform-infra/metadata > key
 
     pushd bosh-state/bbl-state
       bbl plan \
