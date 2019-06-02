@@ -1,4 +1,11 @@
 ---
+groups:
+- name: deploy
+  jobs:
+  - setup-project
+  - deploy-director
+  - deploy-cf
+
 resource_types:
 - name: gcs-resource
   type: docker-image
@@ -94,7 +101,7 @@ jobs:
     file: concourse-gcp-tf-bootstrap/tasks/bootstrap.yml
     input_mapping:
       gcp-bootstrap: concourse-gcp-tf-bootstrap
-    params: &project-ops-params
+    params:
       BILLING_ACCOUNT_ID: ((billing_account_id))
       BUCKET_LOCATION: ((region))
       FOLDER_NAME: ((folder_name))
