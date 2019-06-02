@@ -24,9 +24,9 @@ run:
     gsutil ls gs://${PROJECT_ID}/cf/cf-vars.yml
     resp_cf=$?
     set -e
-    if [[ $resp_bosh -ge 0 ]]; then
+    if [[ $resp_bosh -gt 0 ]]; then
       gsutil cp state.tgz gs://${PROJECT_ID}/bosh/state.tgz
     fi
-    if [[ $resp_cf -ge 0 ]]; then
+    if [[ $resp_cf -gt 0 ]]; then
       gsutil cp cf-vars.yml gs://${PROJECT_ID}/cf/cf-vars.yml
     fi
