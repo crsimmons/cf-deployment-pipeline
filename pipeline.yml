@@ -94,6 +94,11 @@ resources:
       domain: ((domain))
 
 jobs:
+
+# ==========================================
+# Setup project + deploy BOSH and CF
+# ==========================================
+
 - name: setup-project
   serial: true
   plan:
@@ -180,6 +185,10 @@ jobs:
       put: cf-vars
       params:
         file: cf-vars/cf-vars.yml
+
+# ==========================================
+# Delete CF + BOSH
+# ==========================================
 
 - name: delete-cf
   serial: true
