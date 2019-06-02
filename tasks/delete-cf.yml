@@ -1,0 +1,29 @@
+---
+platform: linux
+
+params:
+  GCP_CREDENTIALS_JSON:
+  PROJECT_ID:
+
+inputs:
+- name: bosh-state
+
+run:
+  path: bash
+  args:
+  - -euc
+  - |
+    echo "${GCP_CREDENTIALS_JSON}" > googlecreds.json
+    export gcreds=$PWD/googlecreds.json
+    gcloud auth activate-service-account --key-file="$gcreds"
+
+    pushd bosh-state/bbl-state
+      eval "$(bbl print-env)"
+    popd
+
+    deployment=$(bosh deployments --json | jq '.Tables[].Rows[] | select(.name == "cf")')
+    [[ ! -z "$deployment" ]] || exit 0
+
+    bosh -d cf delete-deployment --non-interactive
+
+    gsutil rm -rf gs://${PROJECT_ID}/cf

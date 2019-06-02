@@ -1,0 +1,29 @@
+---
+platform: linux
+
+params:
+  GCP_CREDENTIALS_JSON:
+  PROJECT_ID:
+
+inputs:
+- name: terraform-infra
+- name: bosh-state
+
+run:
+  path: bash
+  args:
+  - -euc
+  - |
+    echo "${GCP_CREDENTIALS_JSON}" > googlecreds.json
+    export gcreds=$PWD/googlecreds.json
+    gcloud auth activate-service-account --key-file="$gcreds"
+
+    export BBL_GCP_SERVICE_ACCOUNT_KEY=$(jq -r '.service_account_key' terraform-infra/metadata | base64 --decode)
+
+    pushd bosh-state/bbl-state
+      bbl --debug destroy \
+        --no-confirm \
+        --skip-if-missing
+    popd
+
+    gsutil rm -rf gs://${PROJECT_ID}/bosh

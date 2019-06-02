@@ -5,6 +5,11 @@ groups:
   - setup-project
   - deploy-director
   - deploy-cf
+- name: delete-cf
+  jobs:
+  - delete-cf
+  - delete-director
+# - name: delete-project
 
 resource_types:
 - name: gcs-resource
@@ -175,3 +180,43 @@ jobs:
       put: cf-vars
       params:
         file: cf-vars/cf-vars.yml
+
+- name: delete-cf
+  serial: true
+  serial_groups:
+  - bosh
+  plan:
+  - in_parallel:
+    - get: cf-deployment-pipeline
+    - get: bosh-state
+      params:
+        unpack: true
+    - get: pcf-ops
+  - task: delete-cf
+    image: pcf-ops
+    file: cf-deployment-pipeline/tasks/delete-cf.yml
+    params:
+      GCP_CREDENTIALS_JSON: ((gcp_credentials_json))
+      PROJECT_ID: ((project_id))
+
+- name: delete-director
+  serial: true
+  serial_groups:
+  - bosh
+  plan:
+  - in_parallel:
+    - get: cf-deployment-pipeline
+      passed:
+      - delete-cf
+    - get: bosh-state
+      params:
+        unpack: true
+    - get: pcf-ops
+    - get: terraform-infra
+  - task: delete-director
+    image: pcf-ops
+    file: cf-deployment-pipeline/tasks/delete-director.yml
+    params:
+      GCP_CREDENTIALS_JSON: ((gcp_credentials_json))
+      PROJECT_ID: ((project_id))
+      BBL_GCP_REGION: ((region))
