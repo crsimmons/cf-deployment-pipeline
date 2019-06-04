@@ -109,8 +109,6 @@ jobs:
     - get: pcf-ops
   - task: bootstrap-terraform
     file: concourse-gcp-tf-bootstrap/tasks/bootstrap.yml
-    input_mapping:
-      gcp-bootstrap: concourse-gcp-tf-bootstrap
     params:
       BILLING_ACCOUNT_ID: ((billing_account_id))
       BUCKET_LOCATION: ((region))
